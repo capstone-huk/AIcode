@@ -1,4 +1,6 @@
 ### ImageAugmentation.ipynb
+##### [코드 바로가기 ▶](https://github.com/capstone-huk/AIcode/blob/main/ImageAugmentation.ipynb)
+
 Google Drive에 저장된 이미지 파일을 변환하고 증강하는 코드
 
 - Google Drive와 연동하여 이미지를 처리
@@ -12,6 +14,8 @@ Google Drive에 저장된 이미지 파일을 변환하고 증강하는 코드
 - 각 이미지에 대해 5개의 증강된 이미지 생성
 
 ### OpenBankingFraudDetection.ipynb
+##### [코드 바로가기 ▶](https://github.com/capstone-huk/AIcode/blob/main/OpenBankingFraudDetection.ipynb)
+
 카드 거래 내역에서 이상 거래를 탐지할 수 있는 알고리즘
 
 - scikit-learn의 Isolation Forest 알고리즘 사용
