@@ -21,3 +21,16 @@ Google Drive에 저장된 이미지 파일을 변환하고 증강하는 코드
 - scikit-learn의 Isolation Forest 알고리즘 사용
 - 해외 카드 거래 내역 더미 데이터셋 사용
 - 추후 오픈뱅킹을 통해 카드 거래 내역을 가져올 예정
+
+### ATMSkimmingDeviceDetectioon.ipynb
+##### [코드 바로가기 ▶](https://github.com/capstone-huk/AIcode/blob/main/Autoencoder.ipynb)
+
+atm 카드 투입구 사진을 통해 스키밍 장치인지 아닌지 탐지할 수 있는 모델
+
+- autoencoder 모델을 사용
+- 직접 atm 기기의 카드 투입구 사진을 찍어 데이터셋을 구축
+- 성능을 높이기 위해 노이즈 추가
+- 추구 다양한 atm기기의 카드 투입구를 탐지할 수 있는 모델로 업그레이드할 예정
+
+
+
