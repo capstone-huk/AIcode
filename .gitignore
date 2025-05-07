@@ -27,6 +27,8 @@ archive.zip
 .cache
 
 # macOS
-.DS_Store*.ckpt
+.DS_Store
+
+*.ckpt
 *.safetensors
 *.bin
