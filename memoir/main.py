@@ -7,7 +7,7 @@ import torch
 import cv2
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, Form
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse
 from PIL import Image
 from StyleShot.annotator.hed import SOFT_HEDdetector
 from StyleShot.annotator.lineart import LineartDetector
@@ -16,6 +16,19 @@ from transformers import CLIPVisionModelWithProjection
 from huggingface_hub import snapshot_download
 from StyleShot.ip_adapter import StyleShot, StyleContentStableDiffusionControlNetPipeline
 
+import boto3
+from botocore.exceptions import NoCredentialsError
+import uuid
+
+def upload_to_s3(local_file_path: str, bucket: str, region: str, s3_key_prefix: str = "") -> str:
+    s3 = boto3.client('s3')
+    filename = f"{s3_key_prefix}{uuid.uuid4().hex}.png"
+    try:
+        s3.upload_file(local_file_path, bucket, filename, ExtraArgs={'ACL': 'public-read'})
+        return f"https://{bucket}.s3.{region}.amazonaws.com/{filename}"
+    except NoCredentialsError:
+        raise RuntimeError("S3 credentials not found.")
+    
 app = FastAPI()
 
 # === 모델 초기화 ===
@@ -88,11 +101,22 @@ async def generate_image(
     processed_content = Image.fromarray(processed_content)
 
     # 추론
-    result = styleshot.generate(style_image=style_image, prompt=[[prompt]], content_image=processed_content)
+    result = styleshot.generate(style_image=style_image, content_image=processed_content)
     output_image = result[0][0]
 
     # 결과 반환
     img_bytes = io.BytesIO()
     output_image.save(img_bytes, format='PNG')
     img_bytes.seek(0)
-    return StreamingResponse(img_bytes, media_type="image/png")
+    
+    output_path = "result.png"
+    
+    # 👉 S3 업로드
+    s3_url = upload_to_s3(
+        local_file_path=output_path,
+        bucket="hukmemoirbucket",
+        region="ap-northeast-2",
+        s3_key_prefix="results/"
+    )
+    
+    return JSONResponse(content={"s3_url": s3_url})
