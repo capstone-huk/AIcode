@@ -20,6 +20,8 @@ import boto3
 from botocore.exceptions import NoCredentialsError
 import uuid
 
+from PIL import Image
+
 def upload_to_s3(local_file_path: str, bucket: str, region: str, s3_key_prefix: str = "") -> str:
     s3 = boto3.client('s3')
     filename = f"{s3_key_prefix}{uuid.uuid4().hex}.png"
@@ -126,3 +128,23 @@ async def generate_image(
     os.remove(output_path)  # 💡 서버 공간 정리
     
     return JSONResponse(content={"s3_url": s3_url})
+
+@app.post("/test-upload/")
+def test_s3_upload():
+    # 1. 더미 이미지 생성
+    dummy_image = Image.new("RGB", (256, 256), color="blue")
+    temp_path = "test_result.png"
+    dummy_image.save(temp_path)
+
+    # 2. S3 업로드
+    try:
+        s3_url = upload_to_s3(
+            local_file_path=temp_path,
+            bucket="hukmemoirbucket",
+            region="ap-northeast-2",
+            s3_key_prefix="test/"
+        )
+        os.remove(temp_path)  # 업로드 후 파일 정리
+        return {"s3_url": s3_url}
+    except Exception as e:
+        return {"error": str(e)}
