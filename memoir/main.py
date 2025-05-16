@@ -82,8 +82,12 @@ def load_styleshot(preprocessor: str):
 async def generate_image(
     preprocessor: str = Form(...),
     style_url: str = Form(...),
-    content_url: str = Form(...)
+    content_url: str = Form(...),
+    prompt: Optional[str] = Form(None)
 ):
+    if prompt is None:
+        prompt = "default prompt"  # 또는 그냥 빈 문자열로 처리
+
     styleshot, detector = load_styleshot(preprocessor)
 
     # 스타일 이미지 다운로드
@@ -109,7 +113,7 @@ async def generate_image(
     output_image.save(img_bytes, format='PNG')
     img_bytes.seek(0)
     
-    output_path = "result.png"
+    output_path = f"/tmp/{uuid.uuid4().hex}.png"
     output_image.save(output_path)  # ✅ 파일 저장
     
     # 👉 S3 업로드
@@ -119,5 +123,6 @@ async def generate_image(
         region="ap-northeast-2",
         s3_key_prefix="results/"
     )
+    os.remove(output_path)  # 💡 서버 공간 정리
     
     return JSONResponse(content={"s3_url": s3_url})
