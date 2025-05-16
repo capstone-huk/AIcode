@@ -110,6 +110,7 @@ async def generate_image(
     img_bytes.seek(0)
     
     output_path = "result.png"
+    output_image.save(output_path)  # ✅ 파일 저장
     
     # 👉 S3 업로드
     s3_url = upload_to_s3(
