@@ -67,7 +67,6 @@ def load_styleshot(preprocessor: str):
 # === API 엔드포인트 ===
 @app.post("/generate/")
 async def generate_image(
-    prompt: str = Form(...),
     preprocessor: str = Form(...),
     style_url: str = Form(...),
     content_url: str = Form(...)
