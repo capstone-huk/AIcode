@@ -30,7 +30,7 @@ def upload_to_s3(local_file_path: str, bucket: str, region: str, s3_key_prefix: 
     s3 = boto3.client('s3')
     filename = f"{s3_key_prefix}{uuid.uuid4().hex}.png"
     try:
-        s3.upload_file(local_file_path, bucket, filename, ExtraArgs={'ACL': 'public-read'})
+        s3.upload_file(local_file_path, bucket, filename)
         return f"https://{bucket}.s3.{region}.amazonaws.com/{filename}"
     except NoCredentialsError:
         raise RuntimeError("S3 credentials not found.")
