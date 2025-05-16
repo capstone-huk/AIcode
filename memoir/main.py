@@ -23,6 +23,8 @@ import uuid
 from PIL import Image
 from typing import Optional
 
+from dotenv import load_dotenv
+load_dotenv()
 
 def upload_to_s3(local_file_path: str, bucket: str, region: str, s3_key_prefix: str = "") -> str:
     s3 = boto3.client('s3')
