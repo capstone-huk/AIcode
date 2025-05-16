@@ -28,3 +28,9 @@ archive.zip
 
 # macOS
 .DS_Store
+
+# 모델 가중치 (다운로드 전용)
+models/
+
+# Hugging Face 캐시
+**/.cache/huggingface/

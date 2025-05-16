@@ -17,8 +17,9 @@ from StyleShot.ip_adapter import StyleShot, StyleContentStableDiffusionControlNe
 app = FastAPI()
 
 # === 모델 초기화 ===
-base_model_path = "runwayml/stable-diffusion-v1-5"
-transformer_block_path = "laion/CLIP-ViT-H-14-laion2B-s32B-b79K"
+base_model_path = "models/stable-diffusion-v1-5"
+transformer_block_path = "models/CLIP-ViT-H-14-laion2B-s32B-b79K"
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 styleshot_models = {}
 
@@ -28,7 +29,7 @@ def load_styleshot(preprocessor: str):
 
     if preprocessor == "Lineart":
         detector = LineartDetector()
-        styleshot_model_path = "Gaojunyao/StyleShot_lineart"
+        styleshot_model_path = "models/StyleShot_lineart" 
     elif preprocessor == "Contour":
         detector = SOFT_HEDdetector()
         styleshot_model_path = "Gaojunyao/StyleShot"
