@@ -1,9 +1,11 @@
 import sys
 import os
+import requests
 sys.path.append(os.path.join(os.path.dirname(__file__), "StyleShot"))
 import io
 import torch
 import cv2
+import numpy as np
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from PIL import Image
@@ -67,16 +69,20 @@ def load_styleshot(preprocessor: str):
 async def generate_image(
     prompt: str = Form(...),
     preprocessor: str = Form(...),
-    style: UploadFile = File(...),
-    content: UploadFile = File(...)
+    style_url: str = Form(...),
+    content_url: str = Form(...)
 ):
     styleshot, detector = load_styleshot(preprocessor)
 
-    # 스타일 이미지
-    style_image = Image.open(io.BytesIO(await style.read())).convert("RGB")
+    # 스타일 이미지 다운로드
+    style_response = requests.get(style_url)
+    style_response.raise_for_status()
+    style_image = Image.open(io.BytesIO(style_response.content)).convert("RGB")
 
-    # 콘텐츠 이미지
-    content_array = np.frombuffer(await content.read(), np.uint8)
+    # 콘텐츠 이미지 다운로드
+    content_response = requests.get(content_url)
+    content_response.raise_for_status()
+    content_array = np.frombuffer(content_response.content, np.uint8)
     content_image = cv2.imdecode(content_array, cv2.IMREAD_COLOR)
     content_image = cv2.cvtColor(content_image, cv2.COLOR_BGR2RGB)
     processed_content = detector(content_image)
@@ -86,9 +92,8 @@ async def generate_image(
     result = styleshot.generate(style_image=style_image, prompt=[[prompt]], content_image=processed_content)
     output_image = result[0][0]
 
-    # 결과 이미지 응답
+    # 결과 반환
     img_bytes = io.BytesIO()
     output_image.save(img_bytes, format='PNG')
     img_bytes.seek(0)
-
     return StreamingResponse(img_bytes, media_type="image/png")

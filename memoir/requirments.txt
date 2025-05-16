@@ -15,3 +15,5 @@ gradio==4.37.2
 basicsr
 einops
 python-multipart
+requests
+numpy
