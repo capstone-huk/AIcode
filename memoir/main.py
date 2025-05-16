@@ -1,16 +1,18 @@
+import sys
 import os
+sys.path.append(os.path.join(os.path.dirname(__file__), "StyleShot"))
 import io
 import torch
 import cv2
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import StreamingResponse
 from PIL import Image
-from annotator.hed import SOFT_HEDdetector
-from annotator.lineart import LineartDetector
+from StyleShot.annotator.hed import SOFT_HEDdetector
+from StyleShot.annotator.lineart import LineartDetector
 from diffusers import UNet2DConditionModel, ControlNetModel
 from transformers import CLIPVisionModelWithProjection
 from huggingface_hub import snapshot_download
-from ip_adapter import StyleShot, StyleContentStableDiffusionControlNetPipeline
+from StyleShot.ip_adapter import StyleShot, StyleContentStableDiffusionControlNetPipeline
 
 app = FastAPI()
 
