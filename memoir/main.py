@@ -23,6 +23,8 @@ import uuid
 from PIL import Image
 from typing import Optional
 
+import random
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -39,7 +41,7 @@ app = FastAPI()
 
 # === 모델 초기화 ===
 base_model_path = "models/stable-diffusion-v1-5"
-transformer_block_path = "models/CLIP-ViT-H-14-laion2B-s32B-b79K"
+transformer_block_path = "models/laion/CLIP-ViT-H-14-laion2B-s32B-b79K"
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 styleshot_models = {}
@@ -50,7 +52,7 @@ def load_styleshot(preprocessor: str):
 
     if preprocessor == "Lineart":
         detector = LineartDetector()
-        styleshot_model_path = "models/StyleShot_lineart" 
+        styleshot_model_path = "models/Gaojunyao/StyleShot_lineart" 
     elif preprocessor == "Contour":
         detector = SOFT_HEDdetector()
         styleshot_model_path = "Gaojunyao/StyleShot"
@@ -88,49 +90,57 @@ def load_styleshot(preprocessor: str):
 async def generate_image(
     preprocessor: str = Form(...),
     style_url: str = Form(...),
-    content_url: str = Form(...),
     prompt: Optional[str] = Form(None)
 ):
     if prompt is None:
-        prompt = "default prompt"  # 또는 그냥 빈 문자열로 처리
+        prompt = "default prompt"
 
     styleshot, detector = load_styleshot(preprocessor)
 
-    # 스타일 이미지 다운로드
-    style_response = requests.get(style_url)
-    style_response.raise_for_status()
-    style_image = Image.open(io.BytesIO(style_response.content)).convert("RGB")
+    # --- 스타일 이미지 다운로드 ---
+    try:
+        style_response = requests.get(style_url)
+        style_response.raise_for_status()
+        style_image = Image.open(io.BytesIO(style_response.content)).convert("RGB")
+    except Exception as e:
+        return JSONResponse(status_code=400, content={"error": f"Invalid style image URL: {str(e)}"})
 
-    # 콘텐츠 이미지 다운로드
-    content_response = requests.get(content_url)
-    content_response.raise_for_status()
-    content_array = np.frombuffer(content_response.content, np.uint8)
-    content_image = cv2.imdecode(content_array, cv2.IMREAD_COLOR)
-    content_image = cv2.cvtColor(content_image, cv2.COLOR_BGR2RGB)
-    processed_content = detector(content_image)
-    processed_content = Image.fromarray(processed_content)
+    # --- 콘텐츠 이미지 로컬에서 랜덤 선택 ---
+    content_dir = "content_image"
+    try:
+        content_files = [f for f in os.listdir(content_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        if not content_files:
+            return JSONResponse(status_code=500, content={"error": "No content images found on server."})
 
-    # 추론
-    result = styleshot.generate(style_image=style_image, content_image=processed_content)
-    output_image = result[0][0]
+        random_content_path = os.path.join(content_dir, random.choice(content_files))
+        content_image = cv2.imread(random_content_path)
+        content_image = cv2.cvtColor(content_image, cv2.COLOR_BGR2RGB)
+        processed_content = detector(content_image)
+        processed_content = Image.fromarray(processed_content)
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Content image loading failed: {str(e)}"})
 
-    # 결과 반환
-    img_bytes = io.BytesIO()
-    output_image.save(img_bytes, format='PNG')
-    img_bytes.seek(0)
-    
+    # --- 스타일 전이 ---
+    try:
+        result = styleshot.generate(style_image=style_image, content_image=processed_content)
+        output_image = result[0][0]
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"error": f"Image generation failed: {str(e)}"})
+
+    # --- 결과 저장 및 S3 업로드 ---
     output_path = f"/tmp/{uuid.uuid4().hex}.png"
-    output_image.save(output_path)  # ✅ 파일 저장
-    
-    # 👉 S3 업로드
-    s3_url = upload_to_s3(
-        local_file_path=output_path,
-        bucket="hukmemoirbucket",
-        region="ap-northeast-2",
-        s3_key_prefix="results/"
-    )
-    os.remove(output_path)  # 💡 서버 공간 정리
-    
+    output_image.save(output_path)
+
+    try:
+        s3_url = upload_to_s3(
+            local_file_path=output_path,
+            bucket="hukmemoirbucket",
+            region="ap-northeast-2",
+            s3_key_prefix="results/"
+        )
+    finally:
+        os.remove(output_path)
+
     return JSONResponse(content={"s3_url": s3_url})
 
 @app.post("/test-upload/")

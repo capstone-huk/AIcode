@@ -4,7 +4,6 @@ set -e  # 에러 발생 시 중단
 
 echo "🔽 StyleShot 모델 및 종속 모델 다운로드 시작..."
 
-# 기본 디렉토리 구조 설정
 MODEL_DIR="models"
 mkdir -p $MODEL_DIR
 
@@ -21,24 +20,44 @@ if ! command -v git-lfs &> /dev/null; then
   git lfs install
 fi
 
-# 모델 리스트
-declare -A models=(
+# snapshot_download로 받을 모델들
+declare -A snapshot_models=(
   ["StyleShot_lineart"]="Gaojunyao/StyleShot_lineart"
-  ["StyleShot_contour"]="Gaojunyao/StyleShot"
-  ["stable-diffusion-v1-5"]="runwayml/stable-diffusion-v1-5"
   ["CLIP-ViT-H-14-laion2B-s32B-b79K"]="laion/CLIP-ViT-H-14-laion2B-s32B-b79K"
 )
 
-# 모델 다운로드
-for dir in "${!models[@]}"; do
+# git clone으로 받을 모델
+declare -A git_models=(
+  ["stable-diffusion-v1-5"]="https://huggingface.co/stable-diffusion-v1-5/stable-diffusion-v1-5"
+)
+
+# snapshot_download 모델들 다운로드
+for dir in "${!snapshot_models[@]}"; do
   path="$MODEL_DIR/$dir"
-  repo="${models[$dir]}"
+  repo="${snapshot_models[$dir]}"
 
   if [ ! -d "$path" ]; then
-    echo "📦 $repo → $path"
+    echo "📦 snapshot: $repo → $path"
     python3 -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='$repo', local_dir='$path', local_dir_use_symlinks=False)"
   else
-    echo "✅ $repo 이미 존재: $path"
+    echo "✅ 이미 존재: $path"
+  fi
+done
+
+# git clone 모델들 다운로드
+for dir in "${!git_models[@]}"; do
+  path="$MODEL_DIR/$dir"
+  url="${git_models[$dir]}"
+
+  if [ ! -d "$path" ]; then
+    echo "📦 git clone: $url → $path"
+    GIT_LFS_SKIP_SMUDGE=1 git clone "$url" "$path"
+    echo "➡️ Git LFS pull 시작 (파일 다운로드)"
+    cd "$path"
+    git lfs pull
+    cd -
+  else
+    echo "✅ 이미 존재: $path"
   fi
 done
 
