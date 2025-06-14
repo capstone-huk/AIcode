@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware  # ⬅️ CORS 모듈 추가
 from PIL import Image
 from StyleShot.annotator.hed import SOFT_HEDdetector
 from StyleShot.annotator.lineart import LineartDetector
@@ -28,20 +29,7 @@ import random
 from dotenv import load_dotenv
 load_dotenv()
 
-from fastapi.middleware.cors import CORSMiddleware
-
-app = FastAPI()
-
-# CORS 설정 추가
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 또는 ["https://your-frontend-domain.com"]
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
+# === S3 업로드 함수 ===
 def upload_to_s3(local_file_path: str, bucket: str, region: str, s3_key_prefix: str = "") -> str:
     s3 = boto3.client('s3')
     filename = f"{s3_key_prefix}{uuid.uuid4().hex}.png"
@@ -50,30 +38,39 @@ def upload_to_s3(local_file_path: str, bucket: str, region: str, s3_key_prefix: 
         return f"https://{bucket}.s3.{region}.amazonaws.com/{filename}"
     except NoCredentialsError:
         raise RuntimeError("S3 credentials not found.")
-    
+
+# === FastAPI 앱 초기화 ===
 app = FastAPI()
 
-# === 모델 초기화 ===
+# ✅ CORS 설정 추가
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 필요 시 프론트엔드 도메인으로 제한 가능
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# === 모델 및 경로 초기화 ===
 base_model_path = "models/stable-diffusion-v1-5"
 transformer_block_path = "models/laion/CLIP-ViT-H-14-laion2B-s32B-b79K"
-
 device = "cuda" if torch.cuda.is_available() else "cpu"
 styleshot_models = {}
 
+# === StyleShot 모델 로드 ===
 def load_styleshot(preprocessor: str):
     if preprocessor in styleshot_models:
         return styleshot_models[preprocessor]
 
     if preprocessor == "Lineart":
         detector = LineartDetector()
-        styleshot_model_path = "models/Gaojunyao/StyleShot_lineart" 
+        styleshot_model_path = "models/Gaojunyao/StyleShot_lineart"
     elif preprocessor == "Contour":
         detector = SOFT_HEDdetector()
         styleshot_model_path = "Gaojunyao/StyleShot"
     else:
         raise ValueError("Invalid preprocessor")
 
-    # 모델 다운로드
     if not os.path.isdir(styleshot_model_path):
         snapshot_download(styleshot_model_path, local_dir=styleshot_model_path)
 
@@ -99,7 +96,7 @@ def load_styleshot(preprocessor: str):
 
     return styleshot, detector
 
-# === API 엔드포인트 ===
+# === 이미지 생성 API ===
 @app.post("/generate/")
 async def generate_image(
     preprocessor: str = Form(...),
@@ -111,7 +108,6 @@ async def generate_image(
 
     styleshot, detector = load_styleshot(preprocessor)
 
-    # --- 스타일 이미지 다운로드 ---
     try:
         style_response = requests.get(style_url)
         style_response.raise_for_status()
@@ -119,7 +115,6 @@ async def generate_image(
     except Exception as e:
         return JSONResponse(status_code=400, content={"error": f"Invalid style image URL: {str(e)}"})
 
-    # --- 콘텐츠 이미지 로컬에서 랜덤 선택 ---
     content_dir = "content_image"
     try:
         content_files = [f for f in os.listdir(content_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
@@ -134,14 +129,12 @@ async def generate_image(
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Content image loading failed: {str(e)}"})
 
-    # --- 스타일 전이 ---
     try:
         result = styleshot.generate(style_image=style_image, content_image=processed_content)
         output_image = result[0][0]
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": f"Image generation failed: {str(e)}"})
 
-    # --- 결과 저장 및 S3 업로드 ---
     output_path = f"/tmp/{uuid.uuid4().hex}.png"
     output_image.save(output_path)
 
@@ -157,14 +150,13 @@ async def generate_image(
 
     return JSONResponse(content={"s3_url": s3_url})
 
+# === 테스트용 S3 업로드 API ===
 @app.post("/test-upload/")
 def test_s3_upload():
-    # 1. 더미 이미지 생성
     dummy_image = Image.new("RGB", (256, 256), color="blue")
     temp_path = "test_result.png"
     dummy_image.save(temp_path)
 
-    # 2. S3 업로드
     try:
         s3_url = upload_to_s3(
             local_file_path=temp_path,
@@ -172,7 +164,7 @@ def test_s3_upload():
             region="ap-northeast-2",
             s3_key_prefix="test/"
         )
-        os.remove(temp_path)  # 업로드 후 파일 정리
-        return {"s3_url": s3_url}
-    except Exception as e:
-        return {"error": str(e)}
+    finally:
+        os.remove(temp_path)
+
+    return JSONResponse(content={"s3_url"_
