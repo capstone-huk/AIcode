@@ -167,4 +167,4 @@ def test_s3_upload():
     finally:
         os.remove(temp_path)
 
-    return JSONResponse(content={"s3_url"_
+    return JSONResponse(content={"s3_url"})
