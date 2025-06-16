@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+openai
+boto3
+python-dotenv
+requests
+pillow
+scikit-learn
+webcolors
