@@ -24,22 +24,22 @@ client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # S3 설정
 s3 = boto3.client(
     "s3",
-    region_name=os.getenv("AWS_REGION"),
+    region_name=os.getenv("AWS_S3_REGION"),
     aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
     aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
 )
-BUCKET_NAME = os.getenv("BUCKET_NAME")
-REGION = os.getenv("AWS_REGION")
-
-# 필수 환경 변수 체크
-if not BUCKET_NAME or not REGION:
-    raise ValueError("❌ S3 설정이 .env에서 제대로 로드되지 않았습니다.")
+BUCKET_NAME = os.getenv("AWS_S3_BUCKET_NAME")
+REGION = os.getenv("AWS_S3_REGION")
 
 # FastAPI 앱 생성 및 CORS 설정
 app = FastAPI()
+origins = [
+    "http://localhost:3000",
+    "https://your-frontend-url.com",
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,9 +51,7 @@ CSS_COLOR_MAP = {
     "yellow": "#ffff00", "cyan": "#00ffff", "magenta": "#ff00ff", "gray": "#808080", "orange": "#ffa500",
     "pink": "#ffc0cb", "purple": "#800080", "brown": "#a52a2a", "beige": "#f5f5dc", "olive": "#808000",
     "navy": "#000080", "teal": "#008080", "lime": "#00ff00", "maroon": "#800000", "gold": "#ffd700",
-    "silver": "#c0c0c0", "indigo": "#4b0082", "coral": "#ff7f50", "khaki": "#f0e68c", "lavender": "#e6e6fa",
-    "skyblue": "#87ceeb", "lightgray": "#d3d3d3", "darkgray": "#a9a9a9", "darkblue": "#00008b",
-    "darkgreen": "#006400", "lightpink": "#ffb6c1", "lightblue": "#add8e6",
+    "silver": "#c0c0c0", "indigo": "#4b0082", "coral": "#ff7f50", "khaki": "#f0e68c"
 }
 
 def closest_color(requested_color):
@@ -106,7 +104,8 @@ async def process_image_from_url(image_url: str):
             Bucket=BUCKET_NAME,
             Key=filename,
             Body=img_data,
-            ContentType="image/png"
+            ContentType="image/png",
+            ACL="public-read"
         )
         s3_url = f"https://{BUCKET_NAME}.s3.{REGION}.amazonaws.com/{filename}"
 
@@ -150,9 +149,12 @@ async def test_generate():
             Bucket=BUCKET_NAME,
             Key=filename,
             Body=img_data,
-            ContentType="image/png"
+            ContentType="image/png",
+            ACL="public-read"
         )
         s3_url = f"https://{BUCKET_NAME}.s3.{REGION}.amazonaws.com/{filename}"
+        
+        print(s3_url)
 
         return {
             "message": "Test successful",
@@ -160,6 +162,7 @@ async def test_generate():
             "colors": unique_colors,
             "s3_url": s3_url
         }
+        
 
     except Exception as e:
         return {"message": "Test failed", "error": str(e)}
