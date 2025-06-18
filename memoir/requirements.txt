@@ -17,3 +17,6 @@ einops
 python-multipart
 requests
 numpy
+boto3 
+python-dotenv 
+
