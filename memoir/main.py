@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware  # ⬅️ CORS 모듈 추가
+from fastapi.middleware.cors import CORSMiddleware
 from PIL import Image
 from StyleShot.annotator.hed import SOFT_HEDdetector
 from StyleShot.annotator.lineart import LineartDetector
@@ -20,32 +20,42 @@ from StyleShot.ip_adapter import StyleShot, StyleContentStableDiffusionControlNe
 import boto3
 from botocore.exceptions import NoCredentialsError
 import uuid
-
-from PIL import Image
-from typing import Optional
-
 import random
 
 from dotenv import load_dotenv
 load_dotenv()
 
+# === .env에서 S3 설정 불러오기 ===
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+AWS_REGION = os.getenv("AWS_REGION")
+AWS_BUCKET_NAME = os.getenv("AWS_BUCKET_NAME")
+
+if not all([AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_REGION, AWS_BUCKET_NAME]):
+    raise ValueError("❌ S3 설정이 .env에서 제대로 로드되지 않았습니다.")
+
 # === S3 업로드 함수 ===
-def upload_to_s3(local_file_path: str, bucket: str, region: str, s3_key_prefix: str = "") -> str:
-    s3 = boto3.client('s3')
+def upload_to_s3(local_file_path: str, s3_key_prefix: str = "") -> str:
+    s3 = boto3.client(
+        's3',
+        aws_access_key_id=AWS_ACCESS_KEY_ID,
+        aws_secret_access_key=AWS_SECRET_ACCESS_KEY,
+        region_name=AWS_REGION
+    )
+
     filename = f"{s3_key_prefix}{uuid.uuid4().hex}.png"
     try:
-        s3.upload_file(local_file_path, bucket, filename)
-        return f"https://{bucket}.s3.{region}.amazonaws.com/{filename}"
+        s3.upload_file(local_file_path, AWS_BUCKET_NAME, filename)
+        return f"https://{AWS_BUCKET_NAME}.s3.{AWS_REGION}.amazonaws.com/{filename}"
     except NoCredentialsError:
         raise RuntimeError("S3 credentials not found.")
 
 # === FastAPI 앱 초기화 ===
 app = FastAPI()
 
-# ✅ CORS 설정 추가
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 필요 시 프론트엔드 도메인으로 제한 가능
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -141,8 +151,6 @@ async def generate_image(
     try:
         s3_url = upload_to_s3(
             local_file_path=output_path,
-            bucket="hukmemoirbucket",
-            region="ap-northeast-2",
             s3_key_prefix="results/"
         )
     finally:
@@ -160,11 +168,9 @@ def test_s3_upload():
     try:
         s3_url = upload_to_s3(
             local_file_path=temp_path,
-            bucket="hukmemoirbucket",
-            region="ap-northeast-2",
             s3_key_prefix="test/"
         )
     finally:
         os.remove(temp_path)
 
-    return JSONResponse(content={"s3_url"})
+    return JSONResponse(content={"s3_url": s3_url})
